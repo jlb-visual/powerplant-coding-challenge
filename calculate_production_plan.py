@@ -143,9 +143,13 @@ def calculate_production_plan(input_data):
         p['turned_on'] = False
         if p["type"] == "gasfired":
             p["unitary_cost"] = gas_cost / float(p["efficiency"])
+            # add co2 costs
+            p["unitary_cost"] += 0.2 * co2_cost
 
         elif p["type"] == "turbojet":
             p["unitary_cost"] = kerosine_cost / float(p["efficiency"])
+            # add co2 costs
+            p["unitary_cost"] += 0.2 * co2_cost
 
         else:
             # cost of wind is 0
