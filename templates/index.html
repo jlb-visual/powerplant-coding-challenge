@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Cost Calculator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            width: 80%;
+        }
+
+        button {
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+
+    <h2>Gas Cost Calculator</h2>
+
+    <label for="Load">Load:</label><span id="load_value" class="slider-value">50</span><br>
+    <input type="range" id="load" name="load" min="0" max="2000" value="910" oninput="updateSliderValue('load')">
+
+    <label for="gas_cost">Gas Cost:</label><span id="gas_cost_value" class="slider-value">14</span><br>
+    <input type="range" id="gas_cost" name="gas_cost" min="0" max="20" value="14" oninput="updateSliderValue('gas_cost')">
+    
+
+    <label for="kerosene_cost">Kerosene Cost:</label><span id="kerosene_cost_value" class="slider-value">50</span><br>
+    <input type="range" id="kerosene_cost" name="kerosene_cost" min="0" max="100" value="50" oninput="updateSliderValue('kerosene_cost')">
+    
+
+    <label for="co2_cost">CO2 Cost:</label><span id="co2_cost_value" class="slider-value">50</span><br>
+    <input type="range" id="co2_cost" name="co2_cost" min="0" max="40" value="20" oninput="updateSliderValue('co2_cost')">
+    
+    <label for="wind">Wind:</label><span id="wind_value" class="slider-value">50</span><br>
+    <input type="range" id="wind" name="wind" min="0" max="100" value="50" oninput="updateSliderValue('wind')">
+    
+    <br>
+
+    <button onclick="submitForm()">Submit</button>
+
+    <div id="result"></div>
+
+
+    <script>
+
+        window.onload = function() {
+        // Update sliders display values
+        function updateAllSliderValues() {
+            // Get all sliders
+            var sliders = document.querySelectorAll("input[type='range']");
+
+            sliders.forEach(function(slider) {
+                var valueLabel = document.getElementById(slider.id + '_value');
+
+                valueLabel.textContent = slider.value;
+            });
+        }
+
+        // Call function to update values
+        updateAllSliderValues();
+
+    };        
+            function updateSliderValue(sliderId) {
+            var slider = document.getElementById(sliderId);
+            var valueSpan = document.getElementById(sliderId + '_value');
+            valueSpan.textContent = slider.value;
+        }
+
+        function submitForm() {
+
+            // Get the values from the sliders
+            var loadValue = document.getElementById("load").value;
+            var gasCostValue = document.getElementById("gas_cost").value;
+            var keroseneCostValue = document.getElementById("kerosene_cost").value;
+            var co2CostValue = document.getElementById("co2_cost").value;
+            var windValue = document.getElementById("wind").value;
+
+            // Create a JSON object with the slider values
+            var jsonData = {
+                'load': loadValue,
+                'fuels':
+                {
+                'gas(euro/MWh)': gasCostValue,
+                'kerosine(euro/MWh)': keroseneCostValue,
+                'co2(euro/ton)': co2CostValue,
+                'wind(%)': windValue
+                },
+                "powerplants": [
+                    {
+                      "name": "gasfiredbig1",
+                      "type": "gasfired",
+                      "efficiency": 0.53,
+                      "pmin": 100,
+                      "pmax": 460
+                    },
+                    {
+                      "name": "gasfiredbig2",
+                      "type": "gasfired",
+                      "efficiency": 0.53,
+                      "pmin": 100,
+                      "pmax": 460
+                    },
+                    {
+                      "name": "gasfiredsomewhatsmaller",
+                      "type": "gasfired",
+                      "efficiency": 0.37,
+                      "pmin": 40,
+                      "pmax": 210
+                    },
+                    {
+                      "name": "tj1",
+                      "type": "turbojet",
+                      "efficiency": 0.3,
+                      "pmin": 0,
+                      "pmax": 16
+                    },
+                    {
+                      "name": "windpark1",
+                      "type": "windturbine",
+                      "efficiency": 1,
+                      "pmin": 0,
+                      "pmax": 150
+                    },
+                    {
+                      "name": "windpark2",
+                      "type": "windturbine",
+                      "efficiency": 1,
+                      "pmin": 0,
+                      "pmax": 36
+                    }
+                  ]
+            };
+
+            // Make a POST request to the Flask server
+            fetch('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Mostrar la información de cada diccionario en la lista
+                var resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = '<h3>Received Data:</h3>';
+                            
+                if (Array.isArray(data)) {
+                    // Handle the case when data is a list (array of dictionaries)
+                    data.forEach(function (item, index) {
+                        resultDiv.innerHTML += '<p>' + index + ': ' + JSON.stringify(item) + '</p>';
+                    });
+                } else if (typeof data === 'object') {
+                    // Handle the case when data is a dictionary
+                    resultDiv.innerHTML += '<p>' + JSON.stringify(data) + '</p>';
+                } else {
+                    // Handle other cases or display an error message
+                    resultDiv.innerHTML += '<p>Unexpected data format</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>
