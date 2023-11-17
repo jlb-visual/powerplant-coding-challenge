@@ -11,8 +11,8 @@ def index():
     """
     return render_template('index.html')
 
-@app.route('/submit', methods=['POST'])
-def submit():
+@app.route('/productionplan', methods=['POST'])
+def productionplan():
     """
     Handle the /submit endpoint. Read JSON data from the request
     and pass it to the calculate_production_plan function.
