@@ -41,15 +41,15 @@ The algorithm is iterative, having as a reference value the value of the power t
 
 Thus, for each plant, to consider:
 
-1. If the total power to be covered is greater than the minimum power value of the plant considered:
-    * If the total to be covered is greater than the maximum power of the plant under consideration, select the plant with the maximum power value, and subtract this amount from the total power to cover and consider the next plant.
-    * If the amount of remaining power is less than the maximum value of the plant under consideration, select the plant with a power value equal to the remaining power and terminate the algorithm.
+1. If the total power to be covered is higher than the minimum power value (Pmin) of the plant considered:
+    * If the total to be covered is higher than the maximum power (Pmax) of the plant under consideration, select the plant with the maximum power value, and subtract this amount from the total power to cover and consider the next plant.
+    * If the amount of remaining power is lowe than the maximum value of the plant under consideration, select the plant with a power value equal to the remaining power and terminate the algorithm.
 
-2. If the power to be covered is less than the minimum value of the plant under consideration, mark that plant as turned off and move on to the next one in the list.
+2. If the power to be covered is lower than the minimum value of the plant under consideration, mark that plant as turned off and move on to the next one in the list.
 
 On top of this algorithm, we have taken into account the possibility that, in some cases it may be more economical to close a wind plant in order to reach the total power with a gas plant with a lower cost than the last one activated.
 
-To explore this possibility, the program calculates all the combinations of having wind plants on and off and for each case calculates the production cost with the previous algorithm. Of all these cases, the lowest cost option is chosen, which is the one. Once this calculation is made, the algorithm determines that there are more advantageous cases, closing some of the wind plants.
+To explore this possibility, the program calculates all the combinations of having wind plants on and off and for each case calculates the production cost with the previous algorithm. Of all these cases, the lowest cost option is chosen.
 
 
 ## Limitations
