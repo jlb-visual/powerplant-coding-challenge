@@ -1,99 +1,373 @@
-# powerplant-coding-challenge
+# Skyscan 3 Python Migration #
+
+## Overview ##
+
+This repository contains the code of the Skyscan project
+
+The target of the project is to obtain warehouse inventory information from photographs of the shelves obtained by means of a Drone.
+
+The program receives as input a set of images of the racks to be inventoried, as well as certain configuration information, and generates:
+
+1. An output text file with the information on the pallets and labels detected in each photograph as well as their position on a map of the shelf.
+
+2. A rack image map composed of all the images positioned according to the information obtained
+
+## Design notes ##
+
+The information is temporarily stored in an internal database that must be initialized before its execution.
+
+Processing is organized by **racks** and an entitity named **inventory_reference** that groups all images of a rack taken in an inventory activity. This allows to store the results of several inventory activities of the same rack in the database.
+
+The process is carried out in the following steps:
+
+1. Detection by means of Machine Lerning algorithms of pallets, labels, and elements of the shelves used for the positioning of the images.
+
+2. Label processing and obtaining of bar codes and texts
+
+3. Calculation of the position of each image and generation of information on pallets and labels per shelf. This activity can be performed in different ways: 
+   - by image matching and panoramic reconstruction of the rack image or 
+   - by reading the positions from an excel file
+
+4. Generation of ouput files
+
+For the generation of the graphical information, the program uses an image reference that is defined when the rack is initialized in the database. 
+
+The horizontal dimension of this image is the number of rack columns * the number of pixel per column + 2 * a margin in pixels
+
+The vertical dimension of this image is the number of rack rows * the number of pixel per row plus + 2 * a margin in pixels
+
+The number of pixels per row and column and the number of pixels per margin are internal parameters equal to:
+
+"row_height": 3500
+
+"column_width": 4000
+
+"rack_margin": 3500, 
+
+These dimensions have been defined in order to be close to the size of the actual photographs, but note that the size of this image is unmanageable, for this reason everytime an image is to be generated a scale factor to reduce its size must be provided.
+
+### Shelf and position naming ###
+
+The program assumes that the photographs are always taken from left to right. 
+
+The program organizes the pallet positions in **shelves**. Each shelf contains three pallets. The entity **section** indicates the position of the pallet in the shelf and goes from 1 to 3 starting from the left. 
+
+A **column** is a set of shelves arranged vertically in a rack. Columns are numbered from the left starting with 0.
+
+**Rows** refer to the vertical position of the shelves and are numbered from down to top starting with number 0, thus a pallet position is determined by the row, column and section.
+
+In addition to this naming, customers usually have their own mumbering criteria for the pallet columns. This information is stored in a variable named **customer column reference** (customer_col_ref) which, if available, is stored in the output text file.
 
 
-## Welcome !
+### Positioning algorithms ###
 
-Below you can find the description of a coding challenge that we ask people to perform when applying for a job in our team.
+The program can use several alternative image positioning algorithms.
 
-The goal of this coding challenge is to provide the applicant some insight into the business we're in and as such provide the applicant an indication about the challenges she/he will be confronted with. Next, during the first interview we will use the applicant's implementation as a seed to discuss all kinds of interesting software engineering topics.  
+#### Displacement calculation ####
 
-Time is scarce, we know. Therefore we ask you not to spend more than 4 hours on this challenge. We know it is not possible to deliver a finished implementation of the challenge in only four hours. Even though your submission will not be complete, it will provide us plenty of information and topics to discuss later on during the talks.
+This algorithm performs the positioning of the images by calculating the displacement between consecutive images and generates a mosaic image that represents the entire rack by overlapping image over image according to the image displacement and the detection of rack references. The result is an image like the following:
 
-This coding-challenge is part of a formal process and is used in collaboration with the recruiting companies we work with.  Submitting a pull-request will not automatically trigger the recruitement process.
-## Who are we 
+![Scheme](Examples/doc_images/rack_image.jpg)
 
-We are the IS team of the 'Short-term Power as-a-Service' (a.k.a. SPaaS) team within [GEM](https://gems.engie.com/).
+For the use of this algorithm it is essential that the images overlap at least 40% to be able to detect the displacement of one image against the previous one.
 
-[GEM](https://gems.engie.com/), which stands for 'Global Energy Management', is the energy management arm of [ENGIE](https://www.engie.com/), one of the largest global energy players, 
-with access to local markets all over the world.  
+### Reading the image position from a predefined file ###
 
-SPaaS is a team consisting of around 100 people with experience in energy markets, IT and modeling. In smaller teams consisting of a mix of people with different experiences, we are active on the [day-ahead](https://en.wikipedia.org/wiki/European_Power_Exchange#Day-ahead_markets) market, [intraday markets](https://en.wikipedia.org/wiki/European_Power_Exchange#Intraday_markets) and [collaborate with the TSO to balance the grid continuously](https://en.wikipedia.org/wiki/Transmission_system_operator#Electricity_market_operations).
+This algorithm assumes that a photograph is taken for each position. No overlapping between the images is needed since the position is assigned according to the information obtained from an excel file.
 
-## The challenge
+Photographs can be taken per pallet position or per shelf grouping three pallets in the iamge
 
-### In short
-Calculate how much power each of a multitude of different [powerplants](https://en.wikipedia.org/wiki/Power_station) need to produce (a.k.a. the production-plan) when the [load](https://en.wikipedia.org/wiki/Load_profile) is given and taking into account the cost of the underlying energy sources (gas,  kerosine) and the Pmin and Pmax of each powerplant.
+The system can read the positions in two ways: 
 
-### More in detail
+- A flight map can be provided in which all positions that should be photographed are listed in a sequential order. The positioning is done using a predetermined flight schedule in which all the positions that have to be photographed are specified in a way that each photograph of the folder is assigned to a position consecutively. For example first photograph in the folder is assigned to position specified in the first row of the text file, the second to the position of the second row and so on. If there is exactly one image per position in the file and these are taken in the right order, the results are correct. The user must remove manually duplicated images from the initial directory, and if there are positions that are not photographed, the corresponding lines must be removed from the map file.
 
-The load is the continuous demand of power. The total load at each moment in time is forecasted. For instance for Belgium you can see the load forecasted by the grid operator [here](https://www.elia.be/en/grid-data/load-and-load-forecasts).
+- Additionally the program can also read an excel file in which the positions are stated for each photograph. This is the case when a manual positioning has been performed generating a list with the exact position of each image. This is staed in a parameter named read_name_from_excel
 
-At any moment in time, all available powerplants need to generate the power to exactly match the load.  The cost of generating power can be different for every powerplant and is dependent on external factors: The cost of producing power using a [turbojet](https://en.wikipedia.org/wiki/Gas_turbine#Industrial_gas_turbines_for_power_generation), that runs on kerosine, is higher compared to the cost of generating power using a gas-fired powerplant because of gas being cheaper compared to kerosine and because of the [thermal efficiency](https://en.wikipedia.org/wiki/Thermal_efficiency) of a gas-fired powerplant being around 50% (2 units of gas will generate 1 unit of electricity) while that of a turbojet is only around 30%.  The cost of generating power using windmills however is zero. Thus deciding which powerplants to activate is dependent on the [merit-order](https://en.wikipedia.org/wiki/Merit_order).
+In both cases the format of the excel file expected is the same:
 
-When deciding which powerplants in the merit-order to activate (a.k.a. [unit-commitment problem](https://en.wikipedia.org/wiki/Unit_commitment_problem_in_electrical_power_production)) the maximum amount of power each powerplant can produce (Pmax) obviously needs to be taken into account.  Additionally gas-fired powerplants generate a certain minimum amount of power when switched on, called the Pmin. 
+ 1st column(A) is the rack name used and stored in the DB
+ 3rd column(C) is the customer column reference
+ 5th column(E) is the image name used if read_name_from_excel is set to true
+ 6th column(F) is the column; 
+ 7th column(G) is the section; this value not needed when scope is "BOX"
+ 8th column(H) is the rack row used in all cases
+
+An excel file example can bee found in the example folder
+
+## Installation ##
+
+- Clone this directory
 
 
-### Performing the challenge
+```bash
 
-Build a REST API exposing an endpoint `/productionplan` that accepts a POST of which the body contains a payload as you can find in the `example_payloads` directory and that returns a json with the same structure as in `example_response.json` and that manages and logs run-time errors.
+$ git clone git@bitbucket.org:chep-skyscan/chep-skyscan-detection.git
 
-For calculating the unit-commitment, we prefer you not to rely on an existing (linear-programming) solver but instead write an algorithm yourself.
+```
 
-Implementations can be submitted in either C# (on .Net 5 or higher) or Python (3.8 or higher) as these are (currently) the main languages we use in SPaaS. Along with the implementation should be a README that describes how to compile (if applicable) and launch the application.
 
-- C# implementations should contain a project file to compile the application. 
-- Python implementations should contain a `requirements.txt` or a `pyproject.toml` (for use with poetry) to install all needed dependencies.
+- Copy weights, cfg and text detection pb files to config folder. The program requires two weights and two cfg files for pallets, label and rack elements detection and one file for text detection 
 
-#### Payload
 
-The payload contains 3 types of data:
- - load: The load is the amount of energy (MWh) that need to be generated during one hour.
- - fuels: based on the cost of the fuels of each powerplant, the merit-order can be determined which is the starting point for deciding which powerplants should be switched on and how much power they will deliver.  Wind-turbine are either switched-on, and in that case generate a certain amount of energy depending on the % of wind, or can be switched off. 
-   - gas(euro/MWh): the price of gas per MWh. Thus if gas is at 6 euro/MWh and if the efficiency of the powerplant is 50% (i.e. 2 units of gas will generate one unit of electricity), the cost of generating 1 MWh is 12 euro.
-   - kerosine(euro/Mwh): the price of kerosine per MWh.
-   - co2(euro/ton): the price of emission allowances (optionally to be taken into account).
-   - wind(%): percentage of wind. Example: if there is on average 25% wind during an hour, a wind-turbine with a Pmax of 4 MW will generate 1MWh of energy.
- - powerplants: describes the powerplants at disposal to generate the demanded load. For each powerplant is specified:
-   - name:
-   - type: gasfired, turbojet or windturbine.
-   - efficiency: the efficiency at which they convert a MWh of fuel into a MWh of electrical energy. Wind-turbines do not consume 'fuel' and thus are considered to generate power at zero price.
-   - pmax: the maximum amount of power the powerplant can generate.
-   - pmin: the minimum amount of power the powerplant generates when switched on. 
+```bash
 
-#### response
+$ cp /path/to/weight/files/yolov4_custom_shelf.cfg /path/to/config
+$ cp /path/to/weight/files/yolov4_custom_shelf.weights /path/to/config
+$ cp /path/to/weight/files/yolov4_custom_detector.cfg /path/to/config
+$ cp /path/to/weight/files/yolov4_custom_detector.weights /path/to/config
+$ cp /path/to/weight/files/frozen_east_text_detection.pb /path/to/config
 
-The response should be a json as in `example_payloads/response3.json`, which is the expected answer for `example_payloads/payload3.json`, specifying for each powerplant how much power each powerplant should deliver. The power produced by each powerplant has to be a multiple of 0.1 Mw and the sum of the power produced by all the powerplants together should equal the load.
+```
 
-### Want more challenge?
 
-Having fun with this challenge and want to make it more realistic. Optionally, do one of the extra's below:
+- Edit config.py file with the location of the weights files
 
-#### Docker
 
-Provide a Dockerfile along with the implementation to allow deploying your solution quickly.
+- Install required packages
 
-#### CO2
 
-Taken into account that a gas-fired powerplant also emits CO2, the cost of running the powerplant should also take into account the cost of the [emission allowances](https://en.wikipedia.org/wiki/Carbon_emission_trading).  For this challenge, you may take into account that each MWh generated creates 0.3 ton of CO2. 
+```bash
 
-## Acceptance criteria
+$ pip install -r requirements.txt
 
-For a submission to be reviewed as part of an application for a position in the team, the project needs to:
-  - contain a README.md explaining how to build and launch the API
-  - expose the API on port `8888`
+```
 
-Failing to comply with any of these criteria will automatically disqualify the submission.
 
-## More info
+## Program execution ##
 
-For more info on energy management, check out:
+The program is run always from the same script which is **main.py** stating the action that is to be executed and the parameters needed in each step. Action is stated by parameter -a 
 
- - [Global Energy Management Solutions](https://www.youtube.com/watch?v=SAop0RSGdHM)
- - [COO hydroelectric power station](https://www.youtube.com/watch?v=edamsBppnlg)
- - [Management of supply](https://www.youtube.com/watch?v=eh6IIQeeX3c) - video made during winter 2018-2019
+In all steps, the rack name must be stated with keyword -r or --rack_name and the inventory ref must be stated with parameter -i or --inventory_ref, for example
 
-## FAQ
 
-##### Can an existing solver be used to calculate the unit-commitment
-Implementations should not rely on an external solver and thus contain an algorithm written from scratch (clarified in the text as of version v1.1.0)
+```bash
+
+$ python main.py -a detect -r name_of_rack -i inventory_ref -input /path/to/input/folder
+
+```
+
+In all cases the program can be run with display option -d xxx where xxx is the number to milliseconds to display, and it will display the intermediate results in a screen window during that interval of time, this option must not be stated when running in batch or the progrma will crash  
+
+### Detection and tag reading
+
+The first step of the program is the detection of items in the image (pallets, tags and shelf elements) and the reading of the bar codes and texts in the tags. The result of this action is a JSON file per image that contains the results of the detection.
+
+This action can be performed on an image by image basis withe the following command:
+
+```bash
+
+$ python main.py -a detect -r rack_name -i inventory_ref -input /path/to/input/folder -img name_of_image_file -out /path/to/output/folder
+
+```
+Alternatively, if the -img parameter is not provided, the program will perfom the detections on all the files in the input folder.
+
+This action requires the following mandatory arguments:
+- the alphanumeric identifier of the rack given by keyword --rack_name or -ra
+- the alphanumeric identifier of the inventory execution reference given by the keyword -i or --inventory
+- the folder where the images are stored given by the keyword -input or --input_path
+- the folder where the results will be stored given by the keyword -output or --output_path
+
+The following arguments are not mandatory and if not stated the default option is used
+
+- option "web" indicates that a a web service is to be used if the barcodes are not read programmatically, if not stated the service is not invoked
+- option "overlap" indicates that the positioning of the image is performed by overlapping comparison
+- option "scope" indicates if the images are focused in one pallet positon or in a whole box. Options for this argument are "BOX" or "SECTION". Default value is section
+
+
+IMPORTANT: The output files are not stored directly in the output folder but in a subfolder within this named rackname_inventory in order not to mix results of different processes. If there s already a folder with this name and files inside, the program stops. This can be avoided by specifying the parameter -force that will delete the output folder if it existed before the detection process.
+
+```bash
+
+$ python main.py -a detect -r rack_name -i inventory_ref -input /path/to/input/folder -img name_of_image_file -out /path/to/output/folder -force
+
+```
+
+### Database initialization ###
+
+Once the detections have been performed and the results files produced, the program loads this results in an internal database that used to store the intermediate results of the process until the final output is produced. In this phase, the rack entity that stores rack configuration information like number of rows and columns is created, then all the JSON files produced in the detection phase are loaded into the database. 
+
+This action is executed with the following command:
+
+```bash
+
+python main.py -a init_db  -input /path/to/JSON/files -r rack_name -i inventory_ref -sc number_of_shelf_columns -rr number_of_rack_rows
+
+```
+
+First of all, the rack must be created in the database. This action is indicated with the word "init_db".
+If this option is selected, the following arguments are mandatory:
+- the alphanumeric identifier of the rack given by keyword --rack_name or -ra
+- the alphanumeric identifier of the inventory execution reference given by the keyword -i or --inventory
+- the number of shelf columns with the keyword --shelf_columns or -sc 
+- the number of rack rows with the keyword --rack_rows or -rr
+- the pallets per shelf with the keyword --pallets_per_shelf or -ps
+- the name of the folder where the results of the detection phase are
+
+NOTE: The name of the input folder is handled the same way as the output of the detection phase, thus the naming must be the same.
+
+For example in order to create a rack entity with identifier 4-P with 7 rows and 40 columns, and load the results of a set of images stored in the folder files/detections, the following command should be run:
+
+```bash
+
+$ python main.py -a init_db -input files/detections -r 4-P --rack_rows 7 -shelf_columns 40
+
+```
+
+In addition to these arguments, if keyword --create_database is entered, the program will create a new database from scratch, this will remove all information in the database
+
+If argument --force or -f is entered, the program will rewrite the rack in the database. This option allows, for example, changing the size in columns or reows of a rack without destroying the existing database.
+
+
+### Image positioning ###
+
+The program offers several possibilities to perform the image positioning
+
+#### Positioning by image matching ####
+
+ This is performed in 2 steps, first a program is run to detect the isplacement of one image againts the previous one. Images must overlap. 
+
+ These steps require the identifiers of the rack and of the inventory reference
+
+ This is performed with the following command:
+
+
+```bash
+
+   $ python main.py -a dis -r 4-P -i test22
+
+```
+
+
+Then in a second step images are positioned on the map 
+
+```bash
+
+   $ python main.py -a pos -r 4-P -i test22
+
+```
+
+
+#### Positioning by excel file ####
+
+If an excel position file is available, the action is specified by **read_excel**.
+
+This action requires the following parameters:
+
+- the alphanumeric identifier of the rack given by keyword --rack_name or -ra
+- the alphanumeric identifier of the inventory execution reference given by the key word -i or --inventory
+- the name of the excel file given by the keyword -excel or --excel_file
+
+Additionally if option **read_image** is given, the program will read the image name from the corresponding column
+
+```bash
+  
+  python main.py -a read_excel -r 202i_Lidl -i 220628 -excel /examples/flight_map/Mapeo_202impar_1palet.xlsx -d 200  
+
+```
+
+### Generation of results ###
+
+Once the detection and postioning processes have been run, the user can request the generation of the results files. A json file with the information of images and detections can be requested with the following command:
+
+
+```bash
+
+$ python main.py -a json -r 4-P -i 220303 -output /path/to/desired/output/folder
+
+```
+
+
+If the otuput parameter is not specified, the file will be generated in a folder named output in the same folder where the code is
+
+An image file can be generated with the command draw. In this case it is mandatory to state the scale to reduce the reference image  
+
+
+```bash
+
+$ python main.py -a draw -r 4-P -i 220303 -output /path/to/desired/output/folder
+
+```
+
+
+If the otuput parameter is not specified, the file will be generated in a folder named output in the same folder where the code is
+
+
+# SkyScan Anonymizer #
+
+### What is this repository for? ###
+
+* This script anonymizes image files by detecting faces in them and replacing the image section with a blurred or pixelated image.
+
+* The algorithm uses Caffe Model, a generic detector from the OpenCV library that gives good result
+
+
+### Installation ###
+
+
+
+1. Install required packages
+
+```bash
+
+$ pip install -r requirements.txt
+
+```
+
+### How do I get set up? ###
+
+anon_images.py is a python file that must be executed giving as a parameter the files folder where the images are located or the name of one image file
+
+&NewLine;
+&NewLine;
+```bash
+
+$ python anon_images.py -f "/path/to/images"
+
+```
+
+Accepts the following optional parameters:
+
+* -over (overwrite): if included, the modified images are stored with the same name as the initials, thereby losing information from the original images
+
+* -out (output folder): if included, the modified images are stored in a folder with the given name, if the folder does not exist, the program will try to create it
+
+* -i (interactive): run interactively showing the process
+
+* -m (method): anonymization method, options are "simple" or "pixelated" by default it is the "simple" which is blur, the user can specify the number of pixelated blocks with the -b parameter
+
+&NewLine;
+&NewLine;
+
+```bash
+
+$ python anon_images -f "/path/to/images"  -out "path/to/pixelated" -m "pixelated" -b 8
+
+```
+
+Option -c: allows the user to define the minimum confidence level for the face detector
+
+
+### Thumbnail creator ###
+
+create_thumbnails.py is a program to create thumbnails from an image or set of images
+
+It requires at least the following parameters:
+
+* -f (file or folder name)
+
+* -s (scale) the scale to reduce the images
+
+* -w (width) the width of the reduced images, either the scale or the width must be provided, if both parameters are provided, the width is ignored
+
+* -out (output folder): name of the folder where the thumbnails will be stored, if the folder does not exist, the program will try to create it
+
+* -i (interactive): run interactively showing the process
+
+&NewLine;
+&NewLine;
+```bash
+
+$ python create_thumbnails.py -f "/path/to/images" -out "path/to/thumbnails" -s 0.2
+
+```
 
